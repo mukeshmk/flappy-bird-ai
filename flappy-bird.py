@@ -16,11 +16,14 @@ base_img = pygame.transform.scale2x(pygame.image.load(os.path.join("imgs", "base
 class Bird:
     IMGS = bird_imgs
     ANIMATION_TIME = 5
+    ROT_VEL = 20
 
     def __init__(self, x, y):
         # inital x and y position of the bird
         self.x = x
         self.y = y
+        # inital tilt or orientation of the bird
+        self.tilt = 0
         # inital tick_count or time of the bird
         self.tick_count = 0
         # inital velocity of the bird
@@ -43,6 +46,10 @@ class Bird:
         # displacement
         self.y += displacement
 
+        # to rotate the bird as it falls down
+        if self.tilt > -90:
+            self.tilt -= self.ROT_VEL
+
     def draw(self, win):
         self.img_count += 1
 
@@ -59,26 +66,40 @@ class Bird:
             self.img = self.IMGS[0]
             self.img_count = 0
 
-        win.blit(self.img, (self.x, self.y))
+        # For flapping animation of the bird to stop as it falls down
+        if self.tilt <= -80:
+            self.img = self.IMGS[1]
+            self.img_count = self.ANIMATION_TIME*2
+        
+        rotated_image, pos = blitRotateCenter(win, self.img, (self.x, self.y), self.tilt)
+        win.blit(rotated_image, pos)
+        
+# to rotate image about it's centre: https://stackoverflow.com/a/54714144/4014678
+def blitRotateCenter(win, image, topleft, angle):
+
+    rotated_image = pygame.transform.rotate(image, angle)
+    new_rect = rotated_image.get_rect(center = image.get_rect(topleft = topleft).center)
+
+    return rotated_image, new_rect.topleft
 
 def draw_window(win, bird):
     win.blit(bg_img, (0, 0))
-    #bird.move()
     bird.draw(win)
     pygame.display.update()
 
 def main():
     win = pygame.display.set_mode((WIN_WIDTH, WIN_HEIGHT))
+    clock = pygame.time.Clock()
     bird = Bird(200, 200)
     
     run = True
     while run:
+        clock.tick(30)
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 run = False
-            if event.type == pygame.MOUSEBUTTONDOWN:
-                bird.move()
-
+        
+        bird.move()
         draw_window(win, bird)
     
     pygame.quit()

@@ -15,12 +15,13 @@ base_img = pygame.transform.scale2x(pygame.image.load(os.path.join("imgs", "base
 
 class Bird:
     IMGS = bird_imgs
+    ANIMATION_TIME = 5
 
     def __init__(self, x, y):
         # inital x and y position of the bird
         self.x = x
         self.y = y
-        # tick_count for time
+        # inital tick_count or time of the bird
         self.tick_count = 0
         # inital velocity of the bird
         self.vel = 0
@@ -35,15 +36,34 @@ class Bird:
         # s = u * t + 0.5 * a * t^2
         displacement = self.vel * self.tick_count + 0.5 * 3 * (self.tick_count**2)
 
+        # limits the displacement in the downward direction to a max displacement value
+        if displacement >= 16:
+            displacement = 16
+
         # displacement
         self.y += displacement
-        print(str(self.y) + " : " + str(displacement))
 
     def draw(self, win):
+        self.img_count += 1
+
+        # For animation of bird, loop through three images
+        if self.img_count <= self.ANIMATION_TIME:
+            self.img = self.IMGS[0]
+        elif self.img_count <= self.ANIMATION_TIME*2:
+            self.img = self.IMGS[1]
+        elif self.img_count <= self.ANIMATION_TIME*3:
+            self.img = self.IMGS[2]
+        elif self.img_count <= self.ANIMATION_TIME*4:
+            self.img = self.IMGS[1]
+        elif self.img_count == self.ANIMATION_TIME*4 + 1:
+            self.img = self.IMGS[0]
+            self.img_count = 0
+
         win.blit(self.img, (self.x, self.y))
 
 def draw_window(win, bird):
     win.blit(bg_img, (0, 0))
+    #bird.move()
     bird.draw(win)
     pygame.display.update()
 
@@ -58,8 +78,7 @@ def main():
                 run = False
             if event.type == pygame.MOUSEBUTTONDOWN:
                 bird.move()
-        if bird.y > 800:
-            bird.y = 0
+
         draw_window(win, bird)
     
     pygame.quit()

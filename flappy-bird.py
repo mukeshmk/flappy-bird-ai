@@ -1,8 +1,11 @@
 import os
 import time
 import neat
-import pygame
 import random
+
+#pygame version number and welcome message hidden.
+os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
+import pygame
 
 # initiallise font
 pygame.font.init()
@@ -97,6 +100,9 @@ class Bird:
         
         rotated_image, pos = blitRotateCenter(win, self.img, (self.x, self.y), self.tilt)
         win.blit(rotated_image, pos)
+        
+    def get_mask(self):
+        return pygame.mask.from_surface(self.img)
 
 class Pipe:
     GAP = 200
@@ -128,6 +134,23 @@ class Pipe:
         win.blit(self.PIPE_TOP, (self.x, self.top))
         win.blit(self.PIPE_BOTTOM, (self.x, self.bottom))
 
+    def collide(self, bird):
+        # getting the masks for the images
+        bird_mask = bird.get_mask()
+        top_mask = pygame.mask.from_surface(self.PIPE_TOP)
+        bottom_mask = pygame.mask.from_surface(self.PIPE_BOTTOM)
+
+        # calculating the rectangle offset of the images
+        top_offset = (self.x - bird.x, self.top - round(bird.y))
+        bottom_offset = (self.x - bird.x, self.bottom - round(bird.y))
+
+        top_point = bird_mask.overlap(top_mask, top_offset)
+        bottom_point = bird_mask.overlap(bottom_mask, bottom_offset)
+
+        if top_point or bottom_point:
+            return True # collision occured
+        return False
+
 class Base:
     VEL = 5
     WIDTH = base_img.get_width()
@@ -152,8 +175,6 @@ class Base:
     def draw(self, win):
         win.blit(self.IMG, (self.x1, self.y))
         win.blit(self.IMG, (self.x2, self.y))
-        
-
 
 # to rotate image about it's centre: https://stackoverflow.com/a/54714144/4014678
 def blitRotateCenter(win, image, topleft, angle):
@@ -195,11 +216,13 @@ def main():
                 run = False
             if event.type == pygame.MOUSEBUTTONDOWN:
                 bird.jump()
-
+        
         bird.move()
         add_pipe = False
         pipes_to_remove = []
         for pipe in pipes:
+            if pipe.collide(bird):
+                run = False
             # to check if the pipe has left the game window
             if pipe.x + pipe.PIPE_TOP.get_width() < 0:
                 pipes_to_remove.append(pipe)
@@ -214,9 +237,13 @@ def main():
         for pipe in pipes_to_remove:
             pipes.remove(pipe)
 
+        if bird.y + bird.img.get_height() >= FLOOR:
+            run = False
+
         base.move()
         draw_window(win, bird, pipes, base, score)
     
+    pygame.time.wait(2000)
     pygame.quit()
     quit()
 

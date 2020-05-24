@@ -46,7 +46,6 @@ class Bird:
         # displacement
         self.y += displacement
 
-        # to rotate the bird as it falls down
         if self.tilt > -90:
             self.tilt -= self.ROT_VEL
 
@@ -66,14 +65,41 @@ class Bird:
             self.img = self.IMGS[0]
             self.img_count = 0
 
-        # For flapping animation of the bird to stop as it falls down
+        # to stop flapping animation of the bird as it falls down
         if self.tilt <= -80:
             self.img = self.IMGS[1]
             self.img_count = self.ANIMATION_TIME*2
         
         rotated_image, pos = blitRotateCenter(win, self.img, (self.x, self.y), self.tilt)
         win.blit(rotated_image, pos)
+
+class Base:
+    VEL = 5
+    WIDTH = base_img.get_width()
+    IMG = base_img
+
+    def __init__(self, y):
+        self.y = y
+        # for cyclic rotation of the background image
+        self.x1 = 0
+        self.x2 = self.WIDTH
+
+    def move(self):
+        self.x1 -= self.VEL
+        self.x2 -= self.VEL
+
+        if self.x1 + self.WIDTH < 0:
+            self.x1 = self.x2 + self.WIDTH
         
+        if self.x2 + self.WIDTH < 0:
+            self.x2 = self.x1 + self.WIDTH
+
+    def draw(self, win):
+        win.blit(self.IMG, (self.x1, self.y))
+        win.blit(self.IMG, (self.x2, self.y))
+        
+
+
 # to rotate image about it's centre: https://stackoverflow.com/a/54714144/4014678
 def blitRotateCenter(win, image, topleft, angle):
 
@@ -82,15 +108,20 @@ def blitRotateCenter(win, image, topleft, angle):
 
     return rotated_image, new_rect.topleft
 
-def draw_window(win, bird):
+def draw_window(win, bird, base):
     win.blit(bg_img, (0, 0))
+
+    base.draw(win)
     bird.draw(win)
+    
     pygame.display.update()
 
 def main():
     win = pygame.display.set_mode((WIN_WIDTH, WIN_HEIGHT))
     clock = pygame.time.Clock()
-    bird = Bird(200, 200)
+
+    bird = Bird(230, 350)
+    base = Base(730)
     
     run = True
     while run:
@@ -98,9 +129,10 @@ def main():
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 run = False
-        
-        bird.move()
-        draw_window(win, bird)
+ 
+        #bird.move()
+        base.move()
+        draw_window(win, bird, base)
     
     pygame.quit()
     quit()

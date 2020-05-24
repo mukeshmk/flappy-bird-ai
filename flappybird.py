@@ -244,7 +244,7 @@ def main():
         draw_window(win, bird, pipes, base, score)
     
     pygame.time.wait(2000)
-    pygame.quit()
-    quit()
+    #pygame.quit()
+    #quit()
 
-main()
+#main()

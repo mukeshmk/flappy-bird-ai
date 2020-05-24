@@ -10,6 +10,8 @@ import pygame
 # initiallise font
 pygame.font.init()
 
+GEN = 0
+
 WIN_WIDTH = 500
 WIN_HEIGHT = 800
 FLOOR = 730
@@ -184,20 +186,135 @@ def blitRotateCenter(win, image, topleft, angle):
 
     return rotated_image, new_rect.topleft
 
-def draw_window(win, bird, pipes, base, score):
+def draw_window(win, birds, pipes, base, score, gen):
     win.blit(bg_img, (0, 0))
 
     for pipe in pipes:
         pipe.draw(win)
     base.draw(win)
-    bird.draw(win)
+    for bird in birds:
+        bird.draw(win)
     
     # score
     score_label = STAT_FONT.render("Score: " + str(score), 1, (255, 255, 255))
     win.blit(score_label, (WIN_WIDTH - score_label.get_width() - 15, 10))
 
+    if gen > 0:
+        # generation count
+        gen_label = STAT_FONT.render("Gen: " + str(gen), 1, (255, 255, 255))
+        win.blit(gen_label, (10, 10))
+
     pygame.display.update()
 
+def eval_genome(genomes, config):
+    global GEN
+    GEN += 1
+
+    nets = []
+    ge = []
+    birds = []
+
+    for _, g in genomes:
+        # creates a neural network for the genome (bird[i] in one generation)
+        # eval_genome function is called multiple times for each generation
+        net = neat.nn.FeedForwardNetwork.create(g, config)
+        nets.append(net)
+        # creating a bird object to be kept track off
+        birds.append(Bird(230, 350))
+        # initalizing the fitness value of the bird
+        g.fitness = 0
+        ge.append(g)
+
+    win = pygame.display.set_mode((WIN_WIDTH, WIN_HEIGHT))
+    clock = pygame.time.Clock()
+
+    base = Base(FLOOR)
+    pipes = [Pipe(700)]
+
+    score = 0
+    
+    run = True
+    while run:
+        clock.tick(30)
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                run = False
+                pygame.quit()
+                quit()
+
+        # determine whether to use the first or second pipe on the screen for neural network input
+        pipe_ind = 0
+        if len(birds) > 0:
+            if len(pipes) > 1 and birds[0].x > pipes[0].x + pipes[0].PIPE_TOP.get_width():
+                pipe_ind = 1
+        else:
+            run = False
+            break
+
+        for x, bird in enumerate(birds):
+            # give each bird a fitness of 0.1 for each frame it stays alive
+            ge[x].fitness += 0.1
+            bird.move()
+
+            # the input to the neural network is bird location, top pipe location and bottom pipe location
+            # and determine from network whether to jump or not
+            output = nets[x].activate((bird.y, abs(bird.y - pipes[pipe_ind].height), abs(bird.y - pipes[pipe_ind].bottom)))
+
+            # using a tanh activation function so result will be between -1 and 1. if over 0.5 jump
+            # check config file [DefaultGenome] for details
+            # output from the nn is always a list, in our case we have only one output so output[0]
+            if output[0] > 0.5:
+                bird.jump()
+
+        add_pipe = False
+        pipes_to_remove = []
+        for pipe in pipes:
+            # iterate over the birds list to the index and bird
+            for x, bird in enumerate(birds):
+                if pipe.collide(bird):
+                    # reduced the fitness of the bird as it has collided
+                    ge[x].fitness -= 1
+                    # removing the bird, it's nn and it's genome from the list
+                    birds.pop(x)
+                    nets.pop(x)
+                    ge.pop(x)
+
+                if not pipe.passed and pipe.x < bird.x:
+                    pipe.passed = True
+                    add_pipe = True
+
+            # to check if the pipe has left the game window
+            if pipe.x + pipe.PIPE_TOP.get_width() < 0:
+                pipes_to_remove.append(pipe)
+            pipe.move()
+
+        if add_pipe:
+            score += 1
+            # increasing fitness of bird as it passes threw the pipes
+            for g in ge:
+                g.fitness+=5
+            pipes.append(Pipe(600))
+        for pipe in pipes_to_remove:
+            pipes.remove(pipe)
+
+        for x, bird in enumerate(birds):
+            # to check if the bird hits the floor or hits the ceiling
+            if bird.y + bird.img.get_height() >= FLOOR or bird.y < 0:
+                # not reducing the fitness here
+                # removing the bird, it's nn and it's genome from the list
+                birds.pop(x)
+                nets.pop(x)
+                ge.pop(x)
+
+        base.move()
+        draw_window(win, birds, pipes, base, score, GEN)
+
+        # break if score gets large enough
+        if score >= 20:
+            break
+
+# this is the actual main function which will be called when a Human want's to play
+# call happens from game.py
 def main():
     win = pygame.display.set_mode((WIN_WIDTH, WIN_HEIGHT))
     clock = pygame.time.Clock()
@@ -230,10 +347,12 @@ def main():
             if not pipe.passed and pipe.x < bird.x:
                 pipe.passed = True
                 add_pipe = True
-                score += 1
             pipe.move()
+        
         if add_pipe:
+            score += 1
             pipes.append(Pipe(600))
+        
         for pipe in pipes_to_remove:
             pipes.remove(pipe)
 
@@ -241,10 +360,36 @@ def main():
             run = False
 
         base.move()
-        draw_window(win, bird, pipes, base, score)
+        draw_window(win, [bird], pipes, base, score, GEN)
     
     pygame.time.wait(2000)
-    #pygame.quit()
-    #quit()
 
-#main()
+def run(config_file):
+    # loading the config file and it's details with the headings:
+    # [DefaultGenome], [DefaultReproduction], [DefaultSpeciesSet], [DefaultStagnation]
+    # [NEAT] is not required to be mentioned as it's a mandatory config
+    config = neat.config.Config(neat.DefaultGenome, neat.DefaultReproduction,
+                         neat.DefaultSpeciesSet, neat.DefaultStagnation,
+                         config_file)
+
+    # this is used to set the population details from the config file
+    p = neat.Population(config)
+
+    # this is used to give the output
+    p.add_reporter(neat.StdOutReporter(True))
+    stats = neat.StatisticsReporter()
+    p.add_reporter(stats)
+
+    # represents the no of generations to run the fitness funtion
+    generations = 50
+    # the "main" function is our fitness function
+    # the function has to be modified to run for more than one bird
+    # i.e., the entire population in that generation
+    # calling it eval_genome and rewriting the function
+    winner = p.run(eval_genome, generations)
+
+
+if __name__ == "__main__":
+    local_dir = os.path.dirname(__file__)
+    config_file = os.path.join(local_dir + 'config-feedforward.txt')
+    run(config_file)

@@ -4,19 +4,25 @@ import neat
 import pygame
 import random
 
+# initiallise font
+pygame.font.init()
+
 WIN_WIDTH = 500
 WIN_HEIGHT = 800
+FLOOR = 730
 
 bird_imgs = [pygame.transform.scale2x(pygame.image.load(os.path.join("imgs", "bird" + str(x) + ".png"))) for x in range(1,4)]
 pipe_img = pygame.transform.scale2x(pygame.image.load(os.path.join("imgs", "pipe.png")))
 bg_img = pygame.transform.scale2x(pygame.image.load(os.path.join("imgs", "bg.png")))
 base_img = pygame.transform.scale2x(pygame.image.load(os.path.join("imgs", "base.png")))
 
+STAT_FONT = pygame.font.SysFont("comicsans", 50)
 
 class Bird:
     IMGS = bird_imgs
     ANIMATION_TIME = 5
     ROT_VEL = 20
+    MAX_ROTATION = 25
 
     def __init__(self, x, y):
         # inital x and y position of the bird
@@ -28,9 +34,20 @@ class Bird:
         self.tick_count = 0
         # inital velocity of the bird
         self.vel = 0
+        # inital height of the bird
+        self.height = self.y
         # inital image of the bird to be displayed
         self.img_count = 0
         self.img = self.IMGS[0]
+    
+    def jump(self):
+        # reseting tick_count (time) = 0 to denote the instant at which the jump occured
+        self.tick_count = 0
+        # storing the height at which the jump occured
+        self.height = self.y
+        # the velocity with which the bird moves up when it jumps
+        # NOTE vel is negative cause the top left corner of the pygame window is (0, 0)
+        self.vel = -10.5
 
     def move(self):
         # increasing time as move occured every "second" or tick
@@ -42,12 +59,20 @@ class Bird:
         # limits the displacement in the downward direction to a max displacement value
         if displacement >= 16:
             displacement = 16
+        
+        # limits the displacement in the upward direction to a max displacement value
+        if displacement < 0:
+            displacement -= 2
 
         # displacement
         self.y += displacement
 
-        if self.tilt > -90:
-            self.tilt -= self.ROT_VEL
+        if displacement < 0 or self.y < self.height + 50:
+            if self.tilt < self.MAX_ROTATION:
+                self.tilt = self.MAX_ROTATION
+        else:
+            if self.tilt > -90:
+                self.tilt -= self.ROT_VEL
 
     def draw(self, win):
         self.img_count += 1
@@ -138,7 +163,7 @@ def blitRotateCenter(win, image, topleft, angle):
 
     return rotated_image, new_rect.topleft
 
-def draw_window(win, bird, pipes, base):
+def draw_window(win, bird, pipes, base, score):
     win.blit(bg_img, (0, 0))
 
     for pipe in pipes:
@@ -146,6 +171,10 @@ def draw_window(win, bird, pipes, base):
     base.draw(win)
     bird.draw(win)
     
+    # score
+    score_label = STAT_FONT.render("Score: " + str(score), 1, (255, 255, 255))
+    win.blit(score_label, (WIN_WIDTH - score_label.get_width() - 15, 10))
+
     pygame.display.update()
 
 def main():
@@ -153,8 +182,10 @@ def main():
     clock = pygame.time.Clock()
 
     bird = Bird(230, 350)
-    base = Base(730)
+    base = Base(FLOOR)
     pipes = [Pipe(700)]
+
+    score = 0
     
     run = True
     while run:
@@ -162,8 +193,10 @@ def main():
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 run = False
-        
-        #bird.move()
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                bird.jump()
+
+        bird.move()
         add_pipe = False
         pipes_to_remove = []
         for pipe in pipes:
@@ -174,6 +207,7 @@ def main():
             if not pipe.passed and pipe.x < bird.x:
                 pipe.passed = True
                 add_pipe = True
+                score += 1
             pipe.move()
         if add_pipe:
             pipes.append(Pipe(600))
@@ -181,7 +215,7 @@ def main():
             pipes.remove(pipe)
 
         base.move()
-        draw_window(win, bird, pipes, base)
+        draw_window(win, bird, pipes, base, score)
     
     pygame.quit()
     quit()

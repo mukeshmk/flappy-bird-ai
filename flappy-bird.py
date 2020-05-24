@@ -164,8 +164,22 @@ def main():
                 run = False
         
         #bird.move()
+        add_pipe = False
+        pipes_to_remove = []
         for pipe in pipes:
+            # to check if the pipe has left the game window
+            if pipe.x + pipe.PIPE_TOP.get_width() < 0:
+                pipes_to_remove.append(pipe)
+
+            if not pipe.passed and pipe.x < bird.x:
+                pipe.passed = True
+                add_pipe = True
             pipe.move()
+        if add_pipe:
+            pipes.append(Pipe(600))
+        for pipe in pipes_to_remove:
+            pipes.remove(pipe)
+
         base.move()
         draw_window(win, bird, pipes, base)
     

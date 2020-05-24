@@ -11,6 +11,7 @@ import pygame
 pygame.font.init()
 
 GEN = 0
+DRAW_LINES = True
 
 WIN_WIDTH = 500
 WIN_HEIGHT = 800
@@ -113,7 +114,6 @@ class Pipe:
     def __init__(self, x):
         self.x = x
         self.height = 0
-        self.gap = 100
 
         self.top = 0
         self.bottom = 0
@@ -186,13 +186,23 @@ def blitRotateCenter(win, image, topleft, angle):
 
     return rotated_image, new_rect.topleft
 
-def draw_window(win, birds, pipes, base, score, gen):
+def draw_window(win, birds, pipes, base, score, gen, pipe_ind):
     win.blit(bg_img, (0, 0))
 
     for pipe in pipes:
         pipe.draw(win)
     base.draw(win)
+    
     for bird in birds:
+        # draw lines from bird to pipe
+        if DRAW_LINES:
+            try:
+                pygame.draw.line(win, (255, 0, 0), (bird.x + bird.img.get_width()/2, bird.y + bird.img.get_height()/2), 
+                        (pipes[pipe_ind].x + pipes[pipe_ind].PIPE_TOP.get_width()/2, pipes[pipe_ind].height), 5)
+                pygame.draw.line(win, (255, 0, 0), (bird.x + bird.img.get_width()/2, bird.y + bird.img.get_height()/2), 
+                        (pipes[pipe_ind].x + pipes[pipe_ind].PIPE_BOTTOM.get_width()/2, pipes[pipe_ind].bottom), 5)
+            except:
+                pass
         bird.draw(win)
     
     # score
@@ -203,6 +213,10 @@ def draw_window(win, birds, pipes, base, score, gen):
         # generation count
         gen_label = STAT_FONT.render("Gen: " + str(gen), 1, (255, 255, 255))
         win.blit(gen_label, (10, 10))
+
+        # alive
+        alive_label = STAT_FONT.render("Alive: " + str(len(birds)), 1, (255, 255, 255))
+        win.blit(alive_label, (10, 50))
 
     pygame.display.update()
 
@@ -307,7 +321,7 @@ def eval_genome(genomes, config):
                 ge.pop(x)
 
         base.move()
-        draw_window(win, birds, pipes, base, score, GEN)
+        draw_window(win, birds, pipes, base, score, GEN, pipe_ind)
 
         # break if score gets large enough
         if score >= 20:
@@ -360,7 +374,7 @@ def main():
             run = False
 
         base.move()
-        draw_window(win, [bird], pipes, base, score, GEN)
+        draw_window(win, [bird], pipes, base, score, GEN, 0)
     
     pygame.time.wait(2000)
 
@@ -388,6 +402,8 @@ def run(config_file):
     # calling it eval_genome and rewriting the function
     winner = p.run(eval_genome, generations)
 
+    # show final stats
+    print('\nBest genome:\n{!s}'.format(winner))
 
 if __name__ == "__main__":
     local_dir = os.path.dirname(__file__)
